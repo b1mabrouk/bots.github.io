@@ -1,9 +1,4 @@
-import os
-from rembg import remove
-from PIL import Image 
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler,filters
-TOKEN ="6950890031:AAGHFZ_c9xk9Fpu5OUNkllEXFwnvZR2Feac"
+
 
 async def help(update: Update, context:ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=update.effective_chat.id, text= 'Hello, I am a bot to remove the background from any image')
