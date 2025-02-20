@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SRT Translator</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .container {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+        .upload-area {
+            border: 2px dashed #dee2e6;
+            border-radius: 10px;
+            padding: 2rem;
+            text-align: center;
+            margin: 2rem 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .upload-area:hover {
+            border-color: #0d6efd;
+            background-color: #f8f9fa;
+        }
+        .upload-area.dragover {
+            border-color: #0d6efd;
+            background-color: #e9ecef;
+        }
+        #file-name {
+            margin-top: 1rem;
+            font-style: italic;
+        }
+        .progress {
+            display: none;
+            margin: 1rem 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-center mb-4">SRT Translator</h1>
+        
+        <form id="upload-form" action="/translate" method="post" enctype="multipart/form-data">
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label for="source_lang" class="form-label">Source Language:</label>
+                    <select class="form-select" name="source_lang" id="source_lang" required>
+                        {% for lang, code in languages.items() %}
+                        <option value="{{ lang }}">{{ lang }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label for="target_lang" class="form-label">Target Language:</label>
+                    <select class="form-select" name="target_lang" id="target_lang" required>
+                        {% for lang, code in languages.items() %}
+                        <option value="{{ lang }}">{{ lang }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="upload-area" id="drop-zone">
+                <img src="https://cdn-icons-png.flaticon.com/512/2916/2916319.png" alt="Upload" style="width: 64px; margin-bottom: 1rem;">
+                <h5>Drag & Drop your SRT file here</h5>
+                <p class="text-muted">or</p>
+                <button type="button" class="btn btn-primary" onclick="document.getElementById('file-input').click()">
+                    Choose File
+                </button>
+                <input type="file" id="file-input" name="file" accept=".srt" style="display: none;" required>
+                <div id="file-name"></div>
+            </div>
+
+            <div class="progress">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+            </div>
+
+            <div class="text-center">
+                <button type="submit" class="btn btn-success btn-lg" id="translate-btn">
+                    Translate
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const fileName = document.getElementById('file-name');
+        const form = document.getElementById('upload-form');
+        const progress = document.querySelector('.progress');
+        const progressBar = document.querySelector('.progress-bar');
+
+        // Prevent default drag behaviors
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        // Highlight drop zone when file is dragged over it
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, unhighlight, false);
+        });
+
+        // Handle dropped files
+        dropZone.addEventListener('drop', handleDrop, false);
+
+        fileInput.addEventListener('change', handleFiles, false);
+
+        form.addEventListener('submit', handleSubmit, false);
+
+        function preventDefaults (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        function highlight(e) {
+            dropZone.classList.add('dragover');
+        }
+
+        function unhighlight(e) {
+            dropZone.classList.remove('dragover');
+        }
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles({target: {files: files}});
+        }
+
+        function handleFiles(e) {
+            const files = e.target.files;
+            if (files.length > 0) {
+                const file = files[0];
+                if (file.name.endsWith('.srt')) {
+                    fileInput.files = files;
+                    fileName.textContent = file.name;
+                } else {
+                    alert('Please upload an SRT file');
+                    fileInput.value = '';
+                    fileName.textContent = '';
+                }
+            }
+        }
+
+        function handleSubmit(e) {
+            e.preventDefault();
+            const formData = new FormData(form);
+            
+            progress.style.display = 'flex';
+            progressBar.style.width = '0%';
+            
+            // Simulate progress
+            let width = 0;
+            const interval = setInterval(() => {
+                if (width >= 90) {
+                    clearInterval(interval);
+                } else {
+                    width++;
+                    progressBar.style.width = width + '%';
+                }
+            }, 50);
+
+            fetch('/translate', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => { throw new Error(err.error) });
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                clearInterval(interval);
+                progressBar.style.width = '100%';
+                
+                // Create download link
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fileInput.files[0].name.replace('.srt', '') + '_translated.srt';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                
+                // Reset form
+                setTimeout(() => {
+                    progress.style.display = 'none';
+                    progressBar.style.width = '0%';
+                    form.reset();
+                    fileName.textContent = '';
+                }, 2000);
+            })
+            .catch(error => {
+                clearInterval(interval);
+                progress.style.display = 'none';
+                alert(error.message);
+            });
+        }
+    </script>
+</body>
+</html>
